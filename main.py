@@ -27,6 +27,7 @@ Output: CSV  →  output_candidates.csv
         JSON →  output_candidates.json
 """
 
+# from matplotlib.pylab import record
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
@@ -118,7 +119,7 @@ def get_constituencies(state_id: int) -> list[dict]:
     if not resp:
         return []
 
-    soup           = BeautifulSoup(resp.text, "html.parser")
+    soup = BeautifulSoup(resp.text, "html.parser")
     constituencies = []
 
     for a in soup.find_all("a", href=True):
@@ -126,13 +127,13 @@ def get_constituencies(state_id: int) -> list[dict]:
         m = re.search(r"constituency_id=(\d+)", href)
         if m and "show_candidates" in href:
             constituencies.append({
-                "constituency_id"  : int(m.group(1)),
+                "constituency_id": int(m.group(1)),
                 "constituency_name": clean(a.get_text()),
-                "state_id"         : state_id,
+                "state_id": state_id,
             })
 
     # deduplicate
-    seen   = set()
+    seen = set()
     unique = []
     for c in constituencies:
         if c["constituency_id"] not in seen:
@@ -202,8 +203,10 @@ def parse_candidate(candidate_id: int) -> dict:
         "self_profession"    : "",
         "spouse_profession"  : "",
         "education"          : "",
+        "status"             : "",
         # ── Criminal ────────────────────────────
         "criminal_cases_count"  : 0,
+        "convictions_count"     : 0,
         "criminal_cases_detail" : "",   # JSON string of list
         # ── Immovable assets ────────────────────
         "immovable_assets_total_self"    : "",
@@ -249,6 +252,8 @@ def parse_candidate(candidate_id: int) -> dict:
             record["self_profession"] = value
         elif label == "Spouse Profession":
             record["spouse_profession"] = value
+        elif label == "Status":
+            record["status"] = value
 
 
     # ── EDUCATION ─────────────────────────────────────────────────────────
@@ -319,7 +324,14 @@ def parse_candidate(candidate_id: int) -> dict:
 
                 if current_case:
                     cases.append(current_case)
+            convictions = 0
+            conviction_text = soup.get_text(" ", strip=True)
 
+            m = re.search(r"(\d+)\s+conviction", conviction_text, re.I)
+            if m:
+                convictions = int(m.group(1))
+
+            record["convictions_count"] = convictions
             record["criminal_cases_count"]  = len(cases)
             record["criminal_cases_detail"] = json.dumps(cases, ensure_ascii=False)
 
