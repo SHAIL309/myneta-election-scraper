@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+output_*.csv
+output_*.json
+checkpoint_*.csv
+checkpoint_*.json
