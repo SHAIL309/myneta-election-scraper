@@ -77,36 +77,36 @@ def safe_get(url: str, retries: int = 3) -> requests.Response | None:
 
 
 # ──────────────────────────────────────────────
-#  STEP 1: Discover all state IDs
+#  STEP 1: Discover all constituency IDs
 # ──────────────────────────────────────────────
-def get_all_state_ids() -> list[dict]:
-    """Scrape home page to get all state IDs for Lok Sabha 2024."""
+def get_all_constituencies() -> list[dict]:
+    """Scrape homepage to get all constituency IDs."""
     url  = f"{BASE_URL}/"
     resp = safe_get(url)
     if not resp:
         return []
 
-    soup   = BeautifulSoup(resp.text, "html.parser")
-    states = []
+    soup = BeautifulSoup(resp.text, "html.parser")
+    constituencies = []
 
     for a in soup.find_all("a", href=True):
         href = a["href"]
-        m = re.search(r"state_id=(\d+)", href)
-        if m and "show_constituencies" in href:
-            states.append({
-                "state_id"  : int(m.group(1)),
-                "state_name": clean(a.get_text()),
+        m = re.search(r"constituency_id=(\d+)", href)
+        if m and "show_candidates" in href:
+            constituencies.append({
+                "constituency_id": int(m.group(1)),
+                "constituency_name": clean(a.get_text())
             })
 
-    # deduplicate by state_id
+    # deduplicate
     seen = set()
     unique = []
-    for s in states:
-        if s["state_id"] not in seen:
-            seen.add(s["state_id"])
-            unique.append(s)
+    for c in constituencies:
+        if c["constituency_id"] not in seen:
+            seen.add(c["constituency_id"])
+            unique.append(c)
 
-    print(f"[INFO] Found {len(unique)} states/UTs")
+    print(f"[INFO] Found {len(unique)} constituencies")
     return unique
 
 
@@ -496,18 +496,23 @@ def scrape_state(state_id: int) -> list[dict]:
 
 
 def scrape_all() -> list[dict]:
-    print("[MODE] ALL states – full Lok Sabha 2024")
-    states  = get_all_state_ids()
+    print("[MODE] ALL constituencies – full Lok Sabha 2024")
+    constituencies = get_all_constituencies()
     records = []
-    for si, state in enumerate(states, 1):
-        print(f"\n═══ State [{si}/{len(states)}]: {state['state_name']} ═══")
-        state_records = scrape_state(state["state_id"])
-        for r in state_records:
-            r["state_name"] = state["state_name"]
-        records.extend(state_records)
-        # Save checkpoint after every state
-        save_results(records, f"checkpoint_{state['state_id']}.csv", f"checkpoint_{state['state_id']}.json")
+
+    for i, con in enumerate(constituencies, 1):
+        print(f"\n═══ Constituency [{i}/{len(constituencies)}]: {con['constituency_name']} ═══")
+        candidates = get_candidate_ids(con["constituency_id"])
+
+        for j, c in enumerate(candidates, 1):
+            print(f"    [{j}/{len(candidates)}] candidate_id={c['candidate_id']}")
+            record = parse_candidate(c["candidate_id"])
+            record["constituency_name"] = con["constituency_name"]
+            records.append(record)
+            time.sleep(DELAY_SEC)
+
     return records
+
 
 
 # ──────────────────────────────────────────────
